@@ -6,5 +6,20 @@
   {
     "url": "https://www.linkedin.com",
     "status": "Accessible"
+  },
+  {
+    "url": "https://www.google.com",
+    "status": "Accessible",
+    "queryParams": {}
+  },
+  {
+    "url": "https://www.amazon.com",
+    "status": "Accessible",
+    "queryParams": {}
+  },
+  {
+    "url": "https://www.google.com",
+    "status": "Accessible",
+    "queryParams": {}
   }
 ]

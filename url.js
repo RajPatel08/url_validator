@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const readline = require("readline");
 const https = require("https");
+const { URL } = require("url"); // Import URL module to easily work with URL parsing
 
 const DATA_FILE = path.join(__dirname, "url_checks.json");
 
@@ -12,47 +13,46 @@ if (!fs.existsSync(DATA_FILE)) {
 
 // Function to load results from the file
 function loadResults() {
-    try {
-        const data = fs.readFileSync(DATA_FILE, "utf-8");
-        return JSON.parse(data);
-    } catch (error) {
-        console.error("Error loading results:", error);
-        return [];
-    }
+    const data = fs.readFileSync(DATA_FILE, "utf-8");
+    return JSON.parse(data);
 }
 
 // Function to save results to the file
 function saveResults(results) {
-    try {
-        fs.writeFileSync(DATA_FILE, JSON.stringify(results, null, 2));
-    } catch (error) {
-        console.error("Error saving results:", error);
-    }
+    fs.writeFileSync(DATA_FILE, JSON.stringify(results, null, 2));
 }
 
 // Function to validate URL format
 function isValidUrl(url) {
-    const urlRegex = /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/;
+    const urlRegex = /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-])\/?$/;
     return urlRegex.test(url);
 }
 
 // Function to check if a URL is accessible
 function checkUrlAccessibility(url) {
     return new Promise((resolve) => {
-        // Ensure the URL has a protocol (https://) if missing
-        if (!/^https?:\/\//i.test(url)) {
-            url = "https://" + url;
-        }
-
         https
             .get(url, (res) => {
                 resolve(res.statusCode === 200 ? "Accessible" : "Blocked");
             })
-            .on("error", (err) => {
-                console.error("Error checking URL:", err);
+            .on("error", () => {
                 resolve("Blocked");
             });
     });
+}
+
+// Function to extract query parameters from a URL
+function extractQueryParams(url) {
+    const parsedUrl = new URL(url); // Parse the URL
+    const params = new URLSearchParams(parsedUrl.search); // Get search params
+    const paramObject = {};
+
+    // Loop through parameters and convert to an object
+    params.forEach((value, key) => {
+        paramObject[key] = value;
+    });
+
+    return paramObject;
 }
 
 // CLI Interface
@@ -99,14 +99,23 @@ async function processUrl(url) {
 
     console.log("Checking URL...");
     const status = await checkUrlAccessibility(url);
-    const results = loadResults();
 
-    // Store the URL and its status
-    results.push({ url, status });
+    // If the URL is accessible, extract search parameters
+    let queryParams = {};
+    if (status === "Accessible") {
+        queryParams = extractQueryParams(url);
+    }
+
+    const results = loadResults();
+    results.push({ url, status, queryParams });
     saveResults(results);
 
     console.log(`URL: ${url}\nStatus: ${status}`);
-    showMenu(); // Show the menu after processing
+    if (status === "Accessible" && Object.keys(queryParams).length > 0) {
+        console.log("Search Parameters:", queryParams);
+    }
+
+    showMenu();
 }
 
 // View saved results
@@ -118,6 +127,12 @@ function viewResults() {
         console.log("\n--- URL Check Results ---");
         results.forEach((result, index) => {
             console.log(`${index + 1}. URL: ${result.url} | Status: ${result.status}`);
+            if (result.status === "Accessible") {
+                // If queryParams exist, display them; otherwise, skip
+                if (result.queryParams && Object.keys(result.queryParams).length > 0) {
+                    console.log("  Search Parameters:", result.queryParams);
+                }
+            }
         });
     }
     showMenu();
